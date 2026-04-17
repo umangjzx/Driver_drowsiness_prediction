@@ -169,6 +169,7 @@ graph TB
     Toggle["Toggle Alarm"]
     Reset["Reset State"]
     Pause["Pause"]
+    EndFlow((End))
     
     Start --> Cal
     Cal -->|Yes| Calibrate
@@ -203,7 +204,7 @@ graph TB
     Toggle --> Loop
     Reset --> Loop
     Pause --> Loop
-    EndDetect --> [*]
+    EndDetect --> EndFlow
     
     style Start fill:#c8e6c9
     style Calibrate fill:#fff9c4
@@ -217,6 +218,7 @@ graph TB
     style Alert fill:#ffcdd2
     style Display fill:#e0f2f1
     style EndDetect fill:#c8e6c9
+    style EndFlow fill:#c8e6c9
 ```
 
 ---
