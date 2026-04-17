@@ -101,97 +101,196 @@ Deep Learning Optimization: ONNX, ONNX-Runtime
 
 ### High-Level Pipeline
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        SYSTEM PIPELINE                          │
-└─────────────────────────────────────────────────────────────────┘
-
-1️⃣  FRAME CAPTURE
-    ↓
-    Webcam → Video Stream (30 FPS)
-
-2️⃣  FACE DETECTION & PREPROCESSING
-    ↓
-    MediaPipe Face Detection
-         ↓
-    468 Facial Landmarks (Face Mesh)
-         ↓
-    Extract Face ROI (64×64 pixels)
-         ↓
-    Histogram Equalization + Normalization
-
-3️⃣  FEATURE EXTRACTION
-    ├─ Eye Aspect Ratio (EAR) from landmarks
-    ├─ Mouth Aspect Ratio (MAR) from landmarks
-    └─ Face ROI for CNN features
-
-4️⃣  TEMPORAL ENCODING
-    ↓
-    Sliding Window Buffer (20 frames)
-         ↓
-    Sequence Creation [1, 20, 64, 64, 3]
-
-5️⃣  ENSEMBLE INFERENCE
-    ├─ Primary: MobileNetV3 + BiLSTM
-    ├─ Fallback: Hugging Face CLIP
-    ├─ Rule-Based: EAR/MAR thresholds
-    └─ Weighted Average Fusion
-
-6️⃣  POST-PROCESSING
-    ├─ Temporal Smoothing (5-frame averaging)
-    ├─ Adaptive Thresholds (calibration-based)
-    ├─ Confidence Filtering (>0.5)
-    └─ State Hysteresis
-
-7️⃣  ALERT SYSTEM
-    ├─ Detect drowsy state
-    ├─ Accumulate frames (>5 consecutive)
-    ├─ Trigger alarm with escalation
-    └─ Audio feedback loop
-
-8️⃣  VISUALIZATION & LOGGING
-    ├─ Real-time HUD overlay
-    ├─ Metrics recording
-    ├─ Performance profiling
-    └─ Error logging
+```mermaid
+graph TD
+    A["🎥 Frame Capture<br/>Webcam → Video Stream<br/>30 FPS"] --> B["🔍 Face Detection & Preprocessing<br/>MediaPipe Face Detection<br/>468 Facial Landmarks"]
+    
+    B --> C["👁️ Feature Extraction<br/>EAR: Eye Aspect Ratio<br/>MAR: Mouth Aspect Ratio<br/>Face ROI: 64×64 pixels"]
+    
+    C --> D["⏱️ Temporal Encoding<br/>Sliding Window: 20 frames<br/>Sequence: [1, 20, 64, 64, 3]"]
+    
+    D --> E["🧠 Ensemble Inference"]
+    E -->|Primary| E1["MobileNetV3 + BiLSTM<br/>92.34% Accuracy"]
+    E -->|Fallback| E2["Hugging Face CLIP<br/>Zero-Shot Classification"]
+    E -->|Rule-Based| E3["EAR/MAR Thresholds<br/>Heuristic Detection"]
+    
+    E1 --> F["⚙️ Post-Processing<br/>Temporal Smoothing: 5-frame avg<br/>Adaptive Thresholds<br/>Confidence Filtering: >0.5<br/>State Hysteresis"]
+    E2 --> F
+    E3 --> F
+    
+    F --> G["🚨 Alert System<br/>Detect Drowsy State<br/>Accumulate Frames >5<br/>Trigger Alarm with Escalation"]
+    
+    G --> H["📊 Visualization & Logging<br/>Real-time HUD Overlay<br/>Metrics Recording<br/>Performance Profiling<br/>Error Logging"]
+    
+    H --> I["✅ Output<br/>Classification: Alert/Drowsy/Yawning<br/>Confidence Score<br/>Performance Metrics"]
+    
+    style A fill:#e1f5ff
+    style B fill:#e3f2fd
+    style C fill:#f3e5f5
+    style D fill:#fce4ec
+    style E fill:#fff3e0
+    style F fill:#f1f8e9
+    style G fill:#ffebee
+    style H fill:#e0f2f1
+    style I fill:#c8e6c9
 ```
 
 ### Model Architecture Details
 
 #### MobileNetV3Small + BiLSTM
 
-```python
-Input: (batch_size, 20, 64, 64, 3)
-    ↓
-TimeDistributed(MobileNetV3Small)
-    → Extracts CNN features: (batch_size, 20, 576)
-    ↓
-Bidirectional LSTM (128 units)
-    → Processes sequence both directions: (batch_size, 20, 256)
-    ↓
-Bidirectional LSTM (64 units)
-    → Final temporal encoding: (batch_size, 128)
-    ↓
-Dense(256, ReLU) → BatchNorm → Dropout(0.4)
-    ↓
-Dense(128, ReLU) → BatchNorm → Dropout(0.3)
-    ↓
-Dense(64, ReLU) → Dropout(0.2)
-    ↓
-Dense(3, Softmax)
-    ↓
-Output: [Alert_prob, Drowsy_prob, Yawning_prob]
-
-Total Parameters: 1,850,355 (7.06 MB)
-Trainable Parameters: 911,235 (3.48 MB)
+```mermaid
+graph TB
+    Input["🔲 Input<br/>Shape: [batch_size, 20, 64, 64, 3]<br/>20 frames × 64×64 RGB images"]
+    
+    Input --> TD["⏰ TimeDistributed Layer<br/>Apply MobileNetV3Small to each frame"]
+    
+    TD --> CNN["🧠 MobileNetV3Small (×20)<br/>Lightweight CNN Backbone<br/>Parameters: 939K<br/>Output: [batch_size, 20, 576]"]
+    
+    CNN --> LSTM1["🔄 Bidirectional LSTM - Layer 1<br/>Units: 128 (both directions)<br/>Processes sequence forward & backward<br/>Output: [batch_size, 20, 256]"]
+    
+    LSTM1 --> LSTM2["🔄 Bidirectional LSTM - Layer 2<br/>Units: 64 (both directions)<br/>Final temporal encoding<br/>Output: [batch_size, 128]"]
+    
+    LSTM2 --> Dense1["🟠 Dense Layer 1<br/>Units: 256<br/>Activation: ReLU<br/>Parameters: 33K"]
+    
+    Dense1 --> BN1["📊 BatchNormalization<br/>Stabilizes training"]
+    
+    BN1 --> Drop1["🚫 Dropout(0.4)<br/>Regularization"]
+    
+    Drop1 --> Dense2["🟠 Dense Layer 2<br/>Units: 128<br/>Activation: ReLU<br/>Parameters: 33K"]
+    
+    Dense2 --> BN2["📊 BatchNormalization<br/>Improves convergence"]
+    
+    BN2 --> Drop2["🚫 Dropout(0.3)<br/>Regularization"]
+    
+    Drop2 --> Dense3["🟠 Dense Layer 3<br/>Units: 64<br/>Activation: ReLU<br/>Parameters: 8K"]
+    
+    Dense3 --> Drop3["🚫 Dropout(0.2)<br/>Final regularization"]
+    
+    Drop3 --> Output["🎯 Output Layer<br/>Units: 3<br/>Activation: Softmax<br/>[Alert_prob, Drowsy_prob, Yawning_prob]"]
+    
+    Output --> Stats["📈 Model Statistics<br/>Total Parameters: 1,850,355<br/>Trainable: 911,235 (3.48 MB)<br/>Model Size: 7.06 MB"]
+    
+    style Input fill:#e3f2fd
+    style TD fill:#bbdefb
+    style CNN fill:#90caf9
+    style LSTM1 fill:#64b5f6
+    style LSTM2 fill:#42a5f5
+    style Dense1 fill:#2196f3
+    style BN1 fill:#1e88e5
+    style Drop1 fill:#1976d2
+    style Dense2 fill:#1565c0
+    style BN2 fill:#0d47a1
+    style Drop2 fill:#1565c0
+    style Dense3 fill:#1976d2
+    style Drop3 fill:#1e88e5
+    style Output fill:#2196f3
+    style Stats fill:#bbdefb
 ```
 
 **Key Design Choices:**
-- ✅ **MobileNetV3Small**: Lightweight CNN backbone (939K params) for real-time inference
-- ✅ **TimeDistributed**: Applies CNN to each frame independently, then temporal LSTM
-- ✅ **BiLSTM**: Captures temporal dependencies in both directions
-- ✅ **BatchNormalization**: Stabilizes training and improves convergence
-- ✅ **Dropout**: Regularization to prevent overfitting
+- ✅ **MobileNetV3Small**: Lightweight CNN backbone (939K params) for real-time inference on CPU
+- ✅ **TimeDistributed**: Applies CNN to each frame independently, preserving temporal sequence
+- ✅ **Bidirectional LSTM**: Captures temporal dependencies in both directions (forward & backward)
+- ✅ **BatchNormalization**: Stabilizes training and improves convergence speed
+- ✅ **Dropout Layers**: Multi-stage regularization prevents overfitting on limited data
+
+---
+
+### Driver State Detection Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Alert: EAR > 0.21<br/>Confidence > 0.75
+    
+    Alert --> Alert: Eyes open<br/>Normal blinking<br/>MAR < 0.65
+    
+    Alert --> Drowsy: EAR < 0.21 x 5 frames<br/>Slow blink detected
+    
+    Alert --> Yawning: MAR > 0.65<br/>Sustained mouth open
+    
+    Drowsy --> Alert: EAR > 0.21 x 5 frames<br/>Eyes open again
+    
+    Drowsy --> Drowsy: Continued<br/>eyes closure
+    
+    Drowsy --> Yawning: MAR > 0.65<br/>Yawning during drowsiness
+    
+    Yawning --> Alert: MAR < 0.65<br/>Mouth closed
+    
+    Yawning --> Drowsy: Eyes still closed<br/>After yawn
+    
+    Yawning --> Yawning: Mouth still open
+    
+    Drowsy --> [*]: Session ended
+    Alert --> [*]: Session ended
+    Yawning --> [*]: Session ended
+    
+    note right of Drowsy
+        🚨 ALARM TRIGGERED
+        After 5 consecutive drowsy frames
+        Progressive escalation:
+        - Beep (1st alert)
+        - Double beep (2nd alert)
+        - Sustained alarm (critical)
+    end note
+```
+
+### Real-Time Detection Workflow
+
+```mermaid
+graph TB
+    Start["▶️ START DETECTION<br/>Initialize detector & webcam"]
+    
+    Start --> Cal{Calibrate?<br/>Press 'c'}
+    Cal -->|Yes| Calibrate["🔧 CALIBRATION<br/>Adjust EAR/MAR thresholds<br/>Personal baseline: 8 seconds"]
+    Cal -->|No| Skip["⏭️ Skip calibration<br/>Use default thresholds"]
+    
+    Calibrate --> Loop["🔄 MAIN LOOP<br/>Capture frame @ 30 FPS"]
+    Skip --> Loop
+    
+    Loop --> Detect["👁️ DETECT FACE<br/>MediaPipe Face Detection<br/>468 Landmarks"]
+    
+    Detect --> Extract["📊 EXTRACT FEATURES<br/>Calculate EAR & MAR<br/>Crop Face ROI"]
+    
+    Extract --> Buffer["💾 BUFFER FRAMES<br/>Store last 20 frames<br/>Create sequence"]
+    
+    Buffer --> Infer["🧠 INFERENCE<br/>MobileNetV3 + BiLSTM<br/>Get class probabilities"]
+    
+    Infer --> Smooth["⏱️ TEMPORAL SMOOTHING<br/>Average last 5 predictions<br/>Apply hysteresis"]
+    
+    Smooth --> Classify["🎯 CLASSIFY STATE<br/>Alert / Drowsy / Yawning"]
+    
+    Classify --> Alarm{Drowsy?<br/>5 consecutive frames}
+    
+    Alarm -->|Yes| Alert["🔊 TRIGGER ALARM<br/>Audio feedback<br/>Visual indicator"]
+    Alarm -->|No| Display
+    
+    Alert --> Display["📹 DISPLAY<br/>Real-time HUD overlay<br/>Show metrics & state"]
+    
+    Display --> Save{Save?<br/>Press 's'}
+    Save -->|Yes| SaveMetrics["💾 SAVE METRICS<br/>Performance data<br/>JSON export"]
+    Save -->|No| Key
+    
+    SaveMetrics --> Key{Key Press?}
+    Key -->|'q'| End["⏹️ END DETECTION<br/>Close webcam<br/>Print summary"]
+    Key -->|'c'| Calibrate
+    Key -->|'a'| Toggle["🔇 Toggle Alarm"]
+    Key -->|'r'| Reset["🔄 Reset State<br/>Clear buffers"]
+    Toggle --> Loop
+    Reset --> Loop
+    Key -->|Other| Loop
+    
+    End --> [*]
+    
+    style Start fill:#c8e6c9
+    style Detect fill:#bbdefb
+    style Infer fill:#f8bbd0
+    style Classify fill:#fff9c4
+    style Alarm fill:#ffccbc
+    style Alert fill:#ffcdd2
+    style Display fill:#e0f2f1
+    style End fill:#c8e6c9
+```
 
 ---
 
@@ -255,6 +354,57 @@ python -c "import tensorflow as tf; import cv2; import mediapipe as mp; print('�
 ---
 
 ## 🎮 Usage
+
+### Complete System Workflow
+
+```mermaid
+graph TB
+    subgraph Development["🔧 DEVELOPMENT PHASE"]
+        A["📦 Dataset Preparation<br/>66,521 labeled images<br/>3 classes: Alert/Drowsy/Yawning"]
+        B["🔄 Data Augmentation<br/>70% augmentation probability<br/>Brightness/Rotation/Noise/Zoom"]
+        C["🧠 Model Training<br/>MobileNetV3 + BiLSTM<br/>100 epochs with early stopping"]
+        D["📊 Visualization<br/>Generate training curves<br/>Loss & accuracy plots"]
+    end
+    
+    subgraph Evaluation["✅ EVALUATION PHASE"]
+        E["🧪 Model Evaluation<br/>Test on held-out dataset<br/>Compute metrics & ROC curves"]
+        F["📈 Generate Reports<br/>Confusion matrix<br/>Per-class performance"]
+        G["💾 Save Artifacts<br/>Best model checkpoint<br/>Visualization PNG files"]
+    end
+    
+    subgraph Deployment["🚀 DEPLOYMENT PHASE"]
+        H["🎥 Real-Time Detection<br/>Webcam input stream<br/>30 FPS inference"]
+        I["🔧 Calibration<br/>Personal thresholds<br/>EAR/MAR adaptation"]
+        J["🚨 Alert System<br/>Drowsiness detection<br/>Audio/visual feedback"]
+        K["📊 Metrics Collection<br/>Track performance<br/>EAR/MAR/confidence data"]
+    end
+    
+    subgraph Analysis["📊 ANALYSIS PHASE"]
+        L["📉 Generate Visualizations<br/>Real-time metrics plots<br/>Prediction distribution"]
+        M["💾 Export Results<br/>JSON metrics export<br/>Markdown reports"]
+        N["📋 Performance Review<br/>Analyze patterns<br/>Identify improvements"]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    L --> M
+    M --> N
+    N -->|Retrain| C
+    
+    style Development fill:#e3f2fd
+    style Evaluation fill:#f3e5f5
+    style Deployment fill:#e8f5e9
+    style Analysis fill:#fff3e0
+```
 
 ### Quick Start: Real-Time Detection
 
@@ -464,32 +614,62 @@ The system was trained on a comprehensive dataset of **66,521 labeled driver fac
 
 ### Dataset Structure
 
-```
-train/
-├── drowsy/
-│   ├── sleepyCombination/      (17,756 images)
-│   │   └── [Combined sleep indicators: blink + head nod]
-│   ├── slowBlinkWithNodding/   (9,412 images)
-│   │   └── [Slow blinking and head nodding patterns]
-│   └── yawning/                (8,862 images)
-│       └── [Mouth open, yawning behavior]
-└── notdrowsy/                  (30,491 images)
-    └── [Alert drivers with eyes open]
+```mermaid
+graph TB
+    Root["📦 Train Dataset<br/>66,521 Total Images"]
+    
+    Root --> Drowsy["😴 Drowsy<br/>27,168 images (40.8%)"]
+    Root --> NotDrowsy["😊 Alert<br/>30,491 images (45.8%)"]
+    
+    Drowsy --> Sleep["💤 Sleep Combination<br/>17,756 images<br/>Combined indicators:<br/>Blink + Head nod"]
+    
+    Drowsy --> Blink["😑 Slow Blink + Nodding<br/>9,412 images<br/>Slow blinking patterns<br/>Head nodding behavior"]
+    
+    Drowsy --> Yawn["😲 Yawning<br/>8,862 images (13.3%)<br/>Mouth open<br/>Yawning behavior"]
+    
+    NotDrowsy --> Alert["👀 Alert Drivers<br/>30,491 images<br/>Eyes open<br/>Attentive state"]
+    
+    style Root fill:#fff3e0
+    style Drowsy fill:#ffcdd2
+    style NotDrowsy fill:#c8e6c9
+    style Sleep fill:#ef9a9a
+    style Blink fill:#ef9a9a
+    style Yawn fill:#f8bbd0
+    style Alert fill:#a5d6a7
 ```
 
 ### Data Augmentation Pipeline
 
-During training, images are augmented with:
-
-```python
-{
-    "brightness": (0.7, 1.3),           # ±30% brightness variation
-    "blur": [3, 5, 7],                  # Gaussian blur kernels
-    "noise": Normal(0, 0.02*255),       # Random Gaussian noise
-    "rotation": (-15°, +15°),           # Rotation range
-    "zoom": (0.9, 1.1),                 # Zoom variation
-    "probability": 0.7                  # 70% of images augmented
-}
+```mermaid
+graph LR
+    Input["🖼️ Input Image"] --> Check{"Augment?<br/>70% Probability"}
+    
+    Check -->|Yes| Bright["🌞 Brightness<br/>0.7 - 1.3x"]
+    Check -->|Yes| Blur["🌫️ Gaussian Blur<br/>Kernel: 3,5,7"]
+    Check -->|Yes| Noise["📡 Noise<br/>N(0, 0.02×255)"]
+    Check -->|Yes| Rotation["🔄 Rotation<br/>-15° to +15°"]
+    Check -->|Yes| Zoom["🔍 Zoom<br/>0.9x - 1.1x"]
+    Check -->|No| NoAug["➡️ No Augmentation"]
+    
+    Bright --> Combine["🎨 Randomly Apply<br/>1-3 Transforms"]
+    Blur --> Combine
+    Noise --> Combine
+    Rotation --> Combine
+    Zoom --> Combine
+    NoAug --> Combine
+    
+    Combine --> Output["✅ Augmented Image<br/>Ready for Training"]
+    
+    style Input fill:#e3f2fd
+    style Check fill:#fff9c4
+    style Bright fill:#ffccbc
+    style Blur fill:#ffccbc
+    style Noise fill:#ffccbc
+    style Rotation fill:#ffccbc
+    style Zoom fill:#ffccbc
+    style NoAug fill:#e0f2f1
+    style Combine fill:#fff9c4
+    style Output fill:#c8e6c9
 ```
 
 ---
@@ -500,44 +680,56 @@ During training, images are augmented with:
 
 #### Per-Class Performance
 
+```mermaid
+graph TB
+    subgraph Alert["✅ ALERT CLASS (Class 0)"]
+        A1["Precision: 91.45%"]
+        A2["Recall: 92.89%"]
+        A3["F1-Score: 92.17%"]
+        A4["Support: 278 samples"]
+    end
+    
+    subgraph Drowsy["⚠️ DROWSY CLASS (Class 1)"]
+        D1["Precision: 93.12%"]
+        D2["Recall: 91.56%"]
+        D3["F1-Score: 92.33%"]
+        D4["Support: 298 samples"]
+    end
+    
+    subgraph Yawn["😲 YAWNING CLASS (Class 2)"]
+        Y1["Precision: 88.76%"]
+        Y2["Recall: 89.45%"]
+        Y3["F1-Score: 89.10%"]
+        Y4["Support: 288 samples"]
+    end
+    
+    style Alert fill:#c8e6c9
+    style Drowsy fill:#fff9c4
+    style Yawn fill:#ffccbc
 ```
-CLASS: ALERT (Class 0)
-├─ Precision: 0.9145  
-├─ Recall:    0.9289  
-├─ F1-Score:  0.9217  
-└─ Support:   278 samples
 
-CLASS: DROWSY (Class 1)
-├─ Precision: 0.9312
-├─ Recall:    0.9156
-├─ F1-Score:  0.9233
-└─ Support:   298 samples
+### Real-Time Performance Metrics
 
-CLASS: YAWNING (Class 2)
-├─ Precision: 0.8876
-├─ Recall:    0.8945
-├─ F1-Score:  0.8910
-└─ Support:   288 samples
-```
-
-### Real-Time Performance
-
-```
-FPS (Frames Per Second):
-├─ Average: 28.9 ± 0.7
-├─ Min: 25.2
-└─ Max: 30.5
-
-Latency Breakdown (milliseconds):
-├─ Face Detection:   12.3 ms (36%)
-├─ Inference:        18.7 ms (54%)
-├─ Post-processing:   3.2 ms (10%)
-└─ Total:            34.2 ms
-
-Memory (Bytes):
-├─ Model: 7.06 MB (loaded once)
-├─ Runtime: 342 MB (CPU, peak: 456 MB)
-└─ GPU: 0 MB (CPU inference)
+```mermaid
+graph TB
+    Perf["⚡ Real-Time Performance"]
+    
+    Perf --> FPS["📊 Frame Rate<br/>Average: 28.9 ± 0.7 FPS<br/>Range: 25.2 - 30.5 FPS<br/>✅ Exceeds 25 FPS Target"]
+    
+    Perf --> Latency["⏱️ Inference Latency<br/>Total: 34.2 ms"]
+    Latency --> L1["👁️ Face Detection: 12.3 ms (36%)"]
+    Latency --> L2["🧠 Inference: 18.7 ms (54%)"]
+    Latency --> L3["🔧 Post-processing: 3.2 ms (10%)"]
+    
+    Perf --> Memory["💾 Memory Usage<br/>Model Size: 7.06 MB<br/>Runtime: 342 MB (peak: 456 MB)<br/>GPU: 0 MB (CPU inference)<br/>✅ Fits in embedded devices"]
+    
+    style Perf fill:#fff9c4
+    style FPS fill:#c8e6c9
+    style Latency fill:#bbdefb
+    style L1 fill:#e3f2fd
+    style L2 fill:#e3f2fd
+    style L3 fill:#e3f2fd
+    style Memory fill:#f0f4c3
 ```
 
 ---
@@ -801,6 +993,47 @@ if drowsy_counter > 5:
 ---
 
 ## 📝 Model Comparison & Benchmarks
+
+### Ensemble Inference Architecture
+
+```mermaid
+graph TB
+    Input["🔲 Input Sequence<br/>20 frames × 64×64 RGB"]
+    
+    Input --> Primary["🥇 PRIMARY MODEL<br/>MobileNetV3 + BiLSTM<br/>Weight: 0.6"]
+    Input --> Secondary["🥈 SECONDARY MODEL<br/>Hugging Face CLIP<br/>Weight: 0.3"]
+    Input --> RuleBased["🥉 RULE-BASED<br/>EAR/MAR Thresholds<br/>Weight: 0.1"]
+    
+    Primary --> P1["📊 Output<br/>Alert: 0.45<br/>Drowsy: 0.35<br/>Yawning: 0.20"]
+    
+    Secondary --> S1["📊 Output<br/>Alert: 0.50<br/>Drowsy: 0.30<br/>Yawning: 0.20"]
+    
+    RuleBased --> R1["📊 Output<br/>Alert: 0.60<br/>Drowsy: 0.40<br/>Yawning: 0.00"]
+    
+    P1 --> Fusion["🔀 WEIGHTED FUSION<br/>Σ(prediction_i × weight_i)<br/>Normalize to [0,1]"]
+    S1 --> Fusion
+    R1 --> Fusion
+    
+    Fusion --> Final["🎯 FINAL OUTPUT<br/>Alert: 0.47 ✓ Highest<br/>Drowsy: 0.34<br/>Yawning: 0.19"]
+    
+    Final --> Confidence["📈 CONFIDENCE SCORE<br/>max_probability = 0.47<br/>Threshold: 0.50<br/>✅ Prediction Valid"]
+    
+    style Input fill:#e3f2fd
+    style Primary fill:#c8e6c9
+    style Secondary fill:#fff9c4
+    style RuleBased fill:#ffccbc
+    style Fusion fill:#f8bbd0
+    style Final fill:#c8e6c9
+    style Confidence fill:#e8f5e9
+```
+
+**Ensemble Strategy Benefits:**
+- ✅ **Robustness**: Combines strengths of multiple models
+- ✅ **Redundancy**: Falls back to rule-based if deep learning fails
+- ✅ **Confidence**: Only triggers alerts when multiple models agree
+- ✅ **Reliability**: Significantly reduces false positives
+
+### Model Performance Comparison
 
 | Model | Parameters | Size | Inference | Accuracy | FPS |
 |-------|-----------|------|-----------|----------|-----|
