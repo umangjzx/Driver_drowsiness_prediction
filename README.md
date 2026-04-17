@@ -321,8 +321,9 @@ graph TB
     N -->|Retrain| C
     N -->|Review| ManRev["Manual Review"]
     ManRev --> C
+    EndFlow((End))
     
-    Deploy --> [*]
+    Deploy --> EndFlow
     
     style Development fill:#e3f2fd
     style Evaluation fill:#f3e5f5
@@ -330,6 +331,7 @@ graph TB
     style Analysis fill:#fff3e0
     style Deploy fill:#c8e6c9
     style ManRev fill:#ffccbc
+    style EndFlow fill:#c8e6c9
 ```
 
 ### Quick Start: Real-Time Detection
