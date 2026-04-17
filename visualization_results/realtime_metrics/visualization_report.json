@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-04-17T09:50:36.327873",
+  "output_directory": "visualization_results\\realtime_metrics",
+  "visualizations": {
+    "Eye Aspect Ratio": "visualization_results\\realtime_metrics\\ear_over_time.png",
+    "Mouth Aspect Ratio": "visualization_results\\realtime_metrics\\mar_over_time.png",
+    "Blink Rate": "visualization_results\\realtime_metrics\\blink_rate.png",
+    "Prediction Distribution": "visualization_results\\realtime_metrics\\prediction_distribution.png",
+    "Confidence Scores": "visualization_results\\realtime_metrics\\confidence_scores.png",
+    "FPS & Latency": "visualization_results\\realtime_metrics\\fps_latency.png"
+  },
+  "total_plots": 6
+}
