@@ -146,55 +146,64 @@ graph TD
 ```mermaid
 graph TB
     Start["Start Detection<br/>Load model 7.06MB<br/>Init webcam"]
-    Start --> Cal{Calibrate?<br/>Press c}
-    Cal -->|Yes| Calibrate["Calibration 8sec<br/>Collect 240 frames<br/>Personalized thresholds"]
-    Cal -->|No| Skip["Skip Calibration<br/>Factory defaults"]
+    Cal{Calibrate?<br/>Press c}
+    Calibrate["Calibration 8sec<br/>Collect 240 frames<br/>Personalized thresholds"]
+    Skip["Skip Calibration<br/>Factory defaults"]
+    Loop["Main Loop<br/>30 FPS target<br/>33ms cycle"]
+    Detect["Face Detection<br/>MediaPipe FaceMesh<br/>468 landmarks<br/>12-15ms"]
+    Extract["Extract Features<br/>EAR, MAR calculation<br/>Face ROI 64x64px<br/>1-2ms"]
+    Buffer["Frame Buffer FIFO<br/>Ring buffer 20 frames<br/>Shape [1,20,64,64,3]"]
+    Ready{Buffer Full?}
+    Display1["Display Waiting"]
+    Key1{Key pressed?}
+    Infer["Ensemble Inference<br/>60% MobileNetV3+LSTM<br/>30% CLIP model<br/>10% Rule-based<br/>34.2ms total"]
+    Smooth["Temporal Smoothing<br/>5-frame exp average<br/>40% jitter reduction"]
+    Classify["State Classification<br/>Alert/Drowsy/Yawning<br/>Confidence threshold"]
+    Alarm{Drowsy Alert?<br/>5+ frames<br/>conf > 0.65}
+    Alert["Trigger Alarm<br/>Audio escalation<br/>Visual HUD overlay"]
+    Display["HUD Display<br/>State, Confidence<br/>EAR/MAR values<br/>FPS counter"]
+    Save{Save metrics?<br/>Press s}
+    SaveMetrics["Export JSON+CSV<br/>Time series data<br/>Alarm events"]
+    Key{Key Command?}
+    EndDetect["End Detection<br/>Close webcam<br/>Print summary"]
+    Toggle["Toggle Alarm"]
+    Reset["Reset State"]
+    Pause["Pause"]
     
-    Calibrate --> Loop["Main Loop<br/>30 FPS target<br/>33ms cycle"]
+    Start --> Cal
+    Cal -->|Yes| Calibrate
+    Cal -->|No| Skip
+    Calibrate --> Loop
     Skip --> Loop
-    
-    Loop --> Detect["Face Detection<br/>MediaPipe FaceMesh<br/>468 landmarks<br/>12-15ms"]
-    Detect --> Extract["Extract Features<br/>EAR, MAR calculation<br/>Face ROI 64x64px<br/>1-2ms"]
-    Extract --> Buffer["Frame Buffer FIFO<br/>Ring buffer 20 frames<br/>Shape [1,20,64,64,3]"]
-    
-    Buffer --> Ready{Buffer Full?}
-    Ready -->|No| Display1["Display Waiting"]
-    Display1 --> Key1{Key pressed?}
-    Key1 -->|q| End
+    Loop --> Detect
+    Detect --> Extract
+    Extract --> Buffer
+    Buffer --> Ready
+    Ready -->|No| Display1
+    Display1 --> Key1
+    Key1 -->|q| EndDetect
     Key1 -->|Other| Loop
     Ready -->|Yes| Infer
-    
-    Infer["Ensemble Inference<br/>60% MobileNetV3+LSTM<br/>30% CLIP model<br/>10% Rule-based<br/>34.2ms total"]
-    
-    Infer --> Smooth["Temporal Smoothing<br/>5-frame exp average<br/>40% jitter reduction"]
-    
-    Smooth --> Classify["State Classification<br/>Alert/Drowsy/Yawning<br/>Confidence threshold"]
-    
-    Classify --> Alarm{Drowsy Alert?<br/>5+ frames<br/>conf > 0.65}
-    
-    Alarm -->|Yes| Alert["Trigger Alarm<br/>Audio escalation<br/>Visual HUD overlay"]
+    Infer --> Smooth
+    Smooth --> Classify
+    Classify --> Alarm
+    Alarm -->|Yes| Alert
     Alarm -->|No| Display
-    
-    Alert --> Display["HUD Display<br/>State, Confidence<br/>EAR/MAR values<br/>FPS counter"]
-    
-    Display --> Save{Save metrics?<br/>Press s}
-    Save -->|Yes| SaveMetrics["Export JSON+CSV<br/>Time series data<br/>Alarm events"]
+    Alert --> Display
+    Display --> Save
+    Save -->|Yes| SaveMetrics
     Save -->|No| Key
     SaveMetrics --> Key
-    
-    Key{Key Command?}
-    Key -->|q| End["End Detection<br/>Close webcam<br/>Print summary"]
+    Key -->|q| EndDetect
     Key -->|c| Calibrate
-    Key -->|a| Toggle["Toggle Alarm"]
-    Key -->|r| Reset["Reset State"]
-    Key -->|p| Pause["Pause"]
+    Key -->|a| Toggle
+    Key -->|r| Reset
+    Key -->|p| Pause
     Key -->|Other| Loop
-    
     Toggle --> Loop
     Reset --> Loop
     Pause --> Loop
-    
-    End --> [*]
+    EndDetect --> [*]
     
     style Start fill:#c8e6c9
     style Calibrate fill:#fff9c4
@@ -207,7 +216,7 @@ graph TB
     style Classify fill:#fff9c4
     style Alert fill:#ffcdd2
     style Display fill:#e0f2f1
-    style End fill:#c8e6c9
+    style EndDetect fill:#c8e6c9
 ```
 
 ---
